@@ -3,13 +3,17 @@ import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
+import java.time.LocalDate
+
+fun computeTomorrowDate(): LocalDate = LocalDate.now().plusDays(1)
 
 fun main () {
     val apiKey = "e142634501294007b0190901252808"
     val cities = arrayOf("Chisinau", "Madrid", "Kyiv", "Amsterdam")
+    val date = computeTomorrowDate()
 
     for (city in cities) {
-        val apiUrl = "https://api.weatherapi.com/v1/forecast.json?q=$city&days=1&dt=2025-08-29&key=$apiKey"
+        val apiUrl = "https://api.weatherapi.com/v1/forecast.json?q=$city&days=1&dt=$date&key=$apiKey"
         println("Weather data for $city:")
         try {
             val url: URL = URI.create(apiUrl).toURL()
