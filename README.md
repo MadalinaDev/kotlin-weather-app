@@ -9,3 +9,7 @@ This project uses the WeatherAPI.com Code Challenge to retrieve the next day’s
 - handled API calls with Retrofit
 - fetched data from WeatherAPI.com
 - displayed data to STDOUT in table format
+
+# Forecast table
+
+![img.png](img.png)
