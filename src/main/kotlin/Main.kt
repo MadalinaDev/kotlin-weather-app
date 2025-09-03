@@ -1,16 +1,44 @@
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.HttpURLConnection
-import java.net.URI
+import kotlinx.coroutines.runBlocking
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 import java.time.LocalDate
-import org.json.JSONObject
 
 fun computeTomorrowDate(): LocalDate = LocalDate.now().plusDays(1)
 
-fun main() {
+suspend fun fetchWeatherData(apiService: WeatherApiService, city: String, date: LocalDate, apiKey: String): WeatherData? {
+    return try {
+        val response = apiService.getForecast(city, 1, date.toString(), apiKey)
+        val day = response.forecast.forecastday[0].day
+        val hour12 = response.forecast.forecastday[0].hour[12]
+
+        WeatherData(
+            city = city,
+            minTemp = day.mintemp_c,
+            maxTemp = day.maxtemp_c,
+            humidity = day.avghumidity,
+            windSpeed = hour12.wind_kph,
+            windDir = hour12.wind_dir
+        )
+    } catch (e: Exception) {
+        println("Error fetching data for $city: ${e.message}")
+        null
+    }
+}
+
+fun main() = runBlocking {
     val apiKey = "e142634501294007b0190901252808"
     val cities = arrayOf("Chisinau", "Madrid", "Kyiv", "Amsterdam")
     val date = computeTomorrowDate()
+
+    val okHttpClient = okhttp3.OkHttpClient.Builder().build()
+
+    val retrofit = Retrofit.Builder()
+        .baseUrl("https://api.weatherapi.com/v1/")
+        .client(okHttpClient)
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+
+    val apiService = retrofit.create(WeatherApiService::class.java)
 
     println("                    Weather Forecast for Tomorrow, $date:")
     println("_____________________________________________________________________________________")
@@ -18,39 +46,23 @@ fun main() {
     println("_____________________________________________________________________________________")
 
     for (city in cities) {
-        val apiUrl = "https://api.weatherapi.com/v1/forecast.json?q=$city&days=1&dt=$date&key=$apiKey"
-        try {
-            val connection = URI.create(apiUrl).toURL().openConnection() as HttpURLConnection
-            connection.requestMethod = "GET"
+        val weatherData = fetchWeatherData(apiService, city, date, apiKey)
 
-            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
-                val response = BufferedReader(InputStreamReader(connection.inputStream)).use { it.readText() }
-                val json = JSONObject(response)
-                val day = json.getJSONObject("forecast")
-                    .getJSONArray("forecastday")
-                    .getJSONObject(0)
-                    .getJSONObject("day")
-                val hour12 = json.getJSONObject("forecast")
-                    .getJSONArray("forecastday")
-                    .getJSONObject(0)
-                    .getJSONArray("hour")
-                    .getJSONObject(12)
-
-                val minTemp = day.getDouble("mintemp_c")
-                val maxTemp = day.getDouble("maxtemp_c")
-                val humidity = day.getInt("avghumidity")
-                val windSpeed = hour12.getDouble("wind_kph")
-                val windDir = hour12.getString("wind_dir")
-
-                println("| %-10s | %12s | %12s | %13s | %11s | %-8s |".format(
-                    city, minTemp, maxTemp, humidity, windSpeed, windDir
-                ))
-            } else {
-                println("| %-10s | %12s | %12s | %13s | %11s | %-8s |".format(city, "-", "-", "-", "-", "-"))
-            }
-        } catch (_: Exception) {
+        if (weatherData != null) {
+            println("| %-10s | %12s | %12s | %13s | %11s | %-8s |".format(
+                weatherData.city,
+                weatherData.minTemp,
+                weatherData.maxTemp,
+                weatherData.humidity,
+                weatherData.windSpeed,
+                weatherData.windDir
+            ))
+        } else {
             println("| %-10s | %12s | %12s | %13s | %11s | %-8s |".format(city, "-", "-", "-", "-", "-"))
         }
     }
     println("_____________________________________________________________________________________")
+
+    okHttpClient.dispatcher.executorService.shutdown()
+    okHttpClient.connectionPool.evictAll()
 }
